@@ -1,0 +1,22 @@
+# 运行时日志(机器本地,绝不上传)
+doubao-vision.log
+*.log
+
+# 临时 / 备份 / 系统文件
+*.tmp
+*.bak
+*~
+.DS_Store
+Thumbs.db
+
+# 编辑器与依赖
+.vscode/
+.idea/
+node_modules/
+dist/
+build/
+
+# 敏感配置
+.env
+credentials.*
+*.pem
