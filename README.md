@@ -23,6 +23,7 @@
 - [❓ 常见问题](#-常见问题)
 - [📌 Topics](#-topics)
 - [🤝 参与贡献](#-参与贡献)
+- [👥 贡献者](#-贡献者)
 - [📄 许可证](#-许可证)
 
 ---
@@ -157,6 +158,14 @@ Copy-Item .\doubao-vision-entry.mjs "$env:USERPROFILE\.dsh\plugins\doubao-vision
 ## 🤝 参与贡献
 
 见 [CONTRIBUTING.md](CONTRIBUTING.md)。核心约束:改 `doubao-vision.mjs` 后必须同步把 shim 与补丁行里的 `?v=N` 加一,否则改完不生效。
+
+## 👥 贡献者
+
+| 角色 | GitHub | 贡献 |
+| :--- | :--- | :--- |
+| 作者 / 维护者 | [hawkongz](https://github.com/hawkongz) | 全部功能设计与实现 |
+
+PR 被合并后,请把你的名字加进这张表。
 
 ## 📄 许可证
 
