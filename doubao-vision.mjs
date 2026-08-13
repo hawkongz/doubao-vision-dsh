@@ -615,11 +615,25 @@ async function probeCdp() {
   }
 }
 
-async function relaunchDoubao(doubaoExe) {
+async function relaunchDoubao(doubaoExe, signal) {
   logLine('relaunch: taskkill + start ' + doubaoExe)
-  try { await execFileP(TASKKILL_EXE, ['/F', '/IM', 'Doubao.exe']) } catch (e) {}
+  // Hard 20s cap per command + abort wiring: a frozen Doubao can make
+  // taskkill/start block for minutes, which previously hung the whole turn
+  // with no way for the stop button to interrupt it.
+  const opts = { timeout: 20000, ...(signal ? { signal } : {}) }
+  try {
+    await execFileP(TASKKILL_EXE, ['/F', '/IM', 'Doubao.exe'], opts)
+  } catch (e) {
+    logLine('relaunch: taskkill failed: ' + String((e && e.message) || e))
+  }
+  if (signal && signal.aborted) return false
   await sleep(2000)
-  try { await execFileP(CMD_EXE, ['/c', 'start', '', doubaoExe, '--remote-debugging-port=' + CDP_PORT]) } catch (e) {}
+  try {
+    await execFileP(CMD_EXE, ['/c', 'start', '', doubaoExe, '--remote-debugging-port=' + CDP_PORT], opts)
+  } catch (e) {
+    logLine('relaunch: start failed: ' + String((e && e.message) || e))
+  }
+  return true
 }
 
 async function ensureCdp(doubaoExe, signal) {
@@ -627,14 +641,15 @@ async function ensureCdp(doubaoExe, signal) {
   if (await quickProbe(signal)) return true
   if (signal && signal.aborted) return false
   logLine('doubao not ready, relaunching')
-  await relaunchDoubao(doubaoExe)
+  await relaunchDoubao(doubaoExe, signal)
   const deadline = Date.now() + 75000
-  for (let i = 0; i < 12; i++) {
+  let poll = 0
+  while (Date.now() < deadline) {
     if (signal && signal.aborted) { logLine('ensureCdp aborted'); return false }
-    if (Date.now() >= deadline) break
     await sleep(2500)
+    poll++
     if (await quickProbe(signal)) {
-      logLine('doubao ready after relaunch (poll ' + (i + 1) + ')')
+      logLine('doubao ready after relaunch (poll ' + poll + ')')
       return true
     }
   }
@@ -848,7 +863,8 @@ export default {
           if (!(await quickProbe())) {
             logLine('pre-step warm-up: relaunching doubao in background')
             await relaunchDoubao(doubaoExe)
-            for (let i = 0; i < 12; i++) {
+            const warmDeadline = Date.now() + 90000
+            while (Date.now() < warmDeadline) {
               await sleep(2500)
               if (await quickProbe()) { logLine('pre-step warm-up: ready'); break }
             }
@@ -986,7 +1002,7 @@ export default {
           const data = await fs.readBytes(target, exec.signal, maxBytes)
           if (data.length === 0) return { ok: false, text: '', error: '图片文件为空' }
           collectImageBytes(data)
-          if (!(await ensureCdp(doubaoExe, exec.signal))) return { ok: false, text: '', error: '桌面豆包不可用:未以调试端口启动或未安装。可用 doubao_cdp restart 重启用调试端口启动豆包' }
+          if (!(await withTimeout(ensureCdp(doubaoExe, exec.signal), 120000, exec.signal))) return { ok: false, text: '', error: '桌面豆包不可用:未以调试端口启动或未安装。可用 doubao_cdp restart 重启用调试端口启动豆包' }
           const text = await withLock(() => doubaoAsk({
             imageB64: Buffer.from(data).toString('base64'),
             mimeType: mime,
@@ -1084,7 +1100,7 @@ export default {
           collectImageBytes(stored.data)
           logLine('recognize_attachment: read ' + (stored.data && stored.data.length) + ' bytes')
           const b64 = Buffer.from(stored.data).toString('base64')
-          if (!(await ensureCdp(doubaoExe, exec.signal))) return { ok: false, text: '', error: '桌面豆包不可用(未以调试端口启动或未安装)。可用 doubao_cdp restart 重启豆包后重试' }
+          if (!(await withTimeout(ensureCdp(doubaoExe, exec.signal), 120000, exec.signal))) return { ok: false, text: '', error: '桌面豆包不可用(未以调试端口启动或未安装)。可用 doubao_cdp restart 重启豆包后重试' }
           const text = await withTimeout(withLock(() => doubaoAsk({
             imageB64: b64,
             mimeType: stored.ref && stored.ref.mediaType,
@@ -1138,9 +1154,11 @@ export default {
             return { ok: true, text: ready ? '豆包已运行,聊天界面就绪' : '豆包已运行,但聊天界面尚未就绪(可能仍在启动)', error: '' }
           }
           if (action === 'restart') {
-            await relaunchDoubao(doubaoExe)
+            await relaunchDoubao(doubaoExe, exec.signal)
+            if (exec.signal && exec.signal.aborted) return { ok: false, text: '', error: '已取消' }
             let ok = false
-            for (let i = 0; i < 12; i++) {
+            const restartDeadline = Date.now() + 75000
+            while (Date.now() < restartDeadline) {
               if (exec.signal && exec.signal.aborted) break
               await sleep(2500)
               if (await quickProbe(exec.signal)) { ok = true; break }
@@ -1163,7 +1181,7 @@ export default {
           }
           if (action === 'ask') {
             if (!args || !args.text || !String(args.text).trim()) return { ok: false, text: '', error: 'ask 操作需要 text 参数' }
-            if (!(await ensureCdp(doubaoExe, exec.signal))) return { ok: false, text: '', error: '桌面豆包不可用' }
+            if (!(await withTimeout(ensureCdp(doubaoExe, exec.signal), 120000, exec.signal))) return { ok: false, text: '', error: '桌面豆包不可用' }
             const text = await withLock(() => doubaoAsk({ prompt: String(args.text).trim(), timeoutMs: 120000, signal: exec.signal }))
             return { ok: true, text, error: '' }
           }
