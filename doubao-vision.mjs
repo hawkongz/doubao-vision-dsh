@@ -395,13 +395,13 @@ const LAST_ID_SCRIPT = '(function(){'
   + '})()'
 
 async function awaitInput(cdp, timeoutMs, needUpload, signal) {
-  const deadline = Date.now() + (timeoutMs || 12000)
+  const deadline = Date.now() + (timeoutMs || 8000)
   while (Date.now() < deadline) {
     if (signal && signal.aborted) return false
     let r
     try { r = await evaluate(cdp, INPUT_READY_SCRIPT, 4000) } catch (e) { r = null }
     if (r && r.textarea && (!needUpload || r.upload)) return true
-    await sleep(1000)
+    await sleep(800)
   }
   return false
 }
@@ -442,8 +442,8 @@ async function prepareChatPage(signal) {
   try {
     await cdp.connect(2000)
     try { await evaluate(cdp, CLICK_NEW_CHAT, 4000) } catch (e) {}
-    await sleep(1000)
-    return await awaitInput(cdp, 10000, true, signal)
+    await sleep(800)
+    return await awaitInput(cdp, 8000, true, signal)
   } catch (e) {
     return false
   } finally {
@@ -471,12 +471,12 @@ async function doubaoAsk({ imageB64, mimeType, prompt, timeoutMs, signal }) {
   try {
     // A freshly relaunched Doubao may still be loading its UI; wait for the
     // chat input, and if the app landed on a non-chat view, open a new chat.
-    let ready = await awaitInput(cdp, 12000, false, signal)
+    let ready = await awaitInput(cdp, 8000, false, signal)
     if (!ready) {
       if (signal && signal.aborted) throw new Error('已取消')
       try { await evaluate(cdp, CLICK_NEW_CHAT, 4000) } catch (e) {}
-      await sleep(1200)
-      ready = await awaitInput(cdp, 12000, false, signal)
+      await sleep(800)
+      ready = await awaitInput(cdp, 8000, false, signal)
     }
     if (!ready) throw new Error('豆包聊天界面未就绪(应用刚启动或停留在首页),请稍后重试')
     // Sending while the previous turn is still generating gets silently dropped.
@@ -627,7 +627,7 @@ async function relaunchDoubao(doubaoExe, signal) {
     logLine('relaunch: taskkill failed: ' + String((e && e.message) || e))
   }
   if (signal && signal.aborted) return false
-  await sleep(2000)
+  await sleep(1500)
   try {
     await execFileP(CMD_EXE, ['/c', 'start', '', doubaoExe, '--remote-debugging-port=' + CDP_PORT], opts)
   } catch (e) {
@@ -646,7 +646,7 @@ async function ensureCdp(doubaoExe, signal) {
   let poll = 0
   while (Date.now() < deadline) {
     if (signal && signal.aborted) { logLine('ensureCdp aborted'); return false }
-    await sleep(2500)
+    await sleep(1000)
     poll++
     if (await quickProbe(signal)) {
       logLine('doubao ready after relaunch (poll ' + poll + ')')
@@ -865,7 +865,7 @@ export default {
             await relaunchDoubao(doubaoExe)
             const warmDeadline = Date.now() + 90000
             while (Date.now() < warmDeadline) {
-              await sleep(2500)
+              await sleep(1000)
               if (await quickProbe()) { logLine('pre-step warm-up: ready'); break }
             }
           }
@@ -1160,7 +1160,7 @@ export default {
             const restartDeadline = Date.now() + 75000
             while (Date.now() < restartDeadline) {
               if (exec.signal && exec.signal.aborted) break
-              await sleep(2500)
+              await sleep(1000)
               if (await quickProbe(exec.signal)) { ok = true; break }
             }
             if (!ok && !(exec.signal && exec.signal.aborted)) ok = await prepareChatPage(exec.signal)

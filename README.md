@@ -78,7 +78,7 @@ Copy-Item .\doubao-vision-entry.mjs "$env:USERPROFILE\.dsh\plugins\doubao-vision
 ```yaml
 - insert:
     - id: doubao-vision
-      name: "file:///C:/Users/你的用户名/.dsh/plugins/doubao-vision-entry.mjs?v=20"
+      name: "file:///C:/Users/你的用户名/.dsh/plugins/doubao-vision-entry.mjs?v=21"
 ```
 
 把路径里的 `C:/Users/你的用户名` 换成你的实际用户目录(`$env:USERPROFILE` 的值)。
